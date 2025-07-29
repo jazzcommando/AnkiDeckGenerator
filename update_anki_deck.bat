@@ -1,4 +1,7 @@
 @echo off
+REM Change la page de code de la console en UTF-8 pour supporter les caracteres speciaux
+chcp 65001 > nul
+
 REM Les deux premiers chiffres/lettres controlent les couleurs :
 REM Premier = fond, Deuxieme = texte
 REM 0 = Noir, 1 = Bleu, 2 = Vert, 3 = Aigue-marine, 4 = Rouge, 5 = Violet, 6 = Jaune
@@ -9,13 +12,13 @@ color 0A
 set SCRIPT_DIR=%~dp0
 
 echo.
-echo ===================================================
+echo *******************************************
 echo   █▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█
 echo   █                                                 █
 echo   █       ✨ THE ANKI IS UPDATING BABYYYYYYY        ✨   █
 echo   █                                                 █
 echo   █▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█
-echo ===================================================
+echo *******************************************
 echo.
 
 REM beep boop bip bip beep boop
@@ -43,7 +46,7 @@ echo.
 color 0F
 echo [IT BEGINS] Lancement du generateur de deck...
 timeout /t 1 /nobreak >nul
-echo Si ça prend un moment, c'est parce qu'il a trop de fichiers WAV.
+echo Si ca prend un moment, c'est parce qu'il a trop de fichiers WAV.
 timeout /t 1 /nobreak >nul
 echo. .
 timeout /t 0 /nobreak >nul
@@ -58,7 +61,7 @@ echo.
 REM Barre de chargement simple (purement esthetique, ne reflete pas le vrai progres lol)
 <nul set /p "=Progres: ["
 for /l %%i in (1,1,20) do (
-    <nul set /p "="="
+    <nul set /p "=^="  REM <-- CORRECTION ICI : ECHAPPER LE SIGNE =
     timeout /t 0 /nobreak >nul
 )
 echo "]"
@@ -71,45 +74,43 @@ REM La sortie du script Python (messages, erreurs, succes) sera affichee ici.
 python "%SCRIPT_DIR%DeckGenerator.py"
 
 echo.
-echo ===================================================
+echo *******************************************
 color 0B
-echo [SUCCES] Deck créé ! Ou mis à jour !
+echo [SUCCES]
 echo.
 timeout /t 0 /nobreak >nul
-echo je sais pas vraiment, le script fait pas la dif entre les deux
 echo.
-echo l'étape suivante est pareil
 timeout /t 1 /nobreak >nul
 echo === ETAPE SUIVANTE ===
 color 0F
 timeout /t 1 /nobreak >nul
-echo Lance Anki
+echo ===================NUMERO UNO: Lance Anki
 echo.
 timeout /t 0 /nobreak >nul
-echo CLIQUE SUR 'Fichier > Importer...'
+echo ===================NUMERO DOS: CLIQUE SUR Fichier - Importer...
 echo.
 timeout /t 0 /nobreak >nul
-echo Et enfin selectionne le fichier .apkg qui vient d'être créé.
+echo ===================NUMERO TRES: Selectionne le fichier apkg qui vient d'etre fait.
 timeout /t 1 /nobreak >nul
-echo Anki mettra a jour les cartes existantes et ajoutera les nouvelles.
+echo ===================Anki mettra a jour les cartes existantes et ajoutera les nouvelles.
 timeout /t 1 /nobreak >nul
-echo Et surtout, le progrès d'apprentissage est preservé (assez important)
+echo *******************************************
+timeout /t 1 /nobreak >nul
+echo ===================Et surtout, le progres d'apprentissage est preserve (assez important)
 echo.
 color 0A
-echo ===================================================
+echo *******************************************
 
 REM Desactive l'environnement virtuel si vous l'avez active
 IF EXIST "%SCRIPT_DIR%venv\Scripts\deactivate.bat" (
     color 07
-    echo [INFO] Deactivating virtual environment...
     timeout /t 1 /nobreak >nul
     call "%SCRIPT_DIR%venv\Scripts\deactivate.bat"
-    echo [INFO] Virtual environment deactivated.
     timeout /t 1 /nobreak >nul
 )
 
 echo.
 color 07
-echo Processus termine. GOOD ENGLANDO.
+echo ===================Processus fini. GOOD ENGLANDO.===================
 echo (tu peux appuyer sur n'importe quelle touche pour fermer ça maintenant btw)
 pause
