@@ -1,0 +1,48 @@
+WELCOME TO THE ANKY FACTORY
+
+
+ce qui était sensé être une seule page python est devenu ~400 lignes de code. o well.
+
+voila comment utiliser ce merdier:
+
+déjà, met le dossier du programme en lui même n'importe où. on s'en fou.
+
+ÉTAPE 1: PRELIMINAIRES
+
+bonne nouvelle: j'ai tout compilé en .exe donc t'as pas besoin d'installer python
+
+mauvaise nouvelle: tu dois quand même installer FFMPEG et ça pue ça. mais ez.
+
+POUR FFMPEG:
+
+	-clique là dessus: https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+	-va directement dans ton dossier C:\ (oui, juste C:\.)
+		-pour aller dans C:, tu peux le faire via le menu démarrer si tu veux
+		-MAIS je trouve que c'est plus simple de faire: touche windows + R --> petite fenêtre s'ouvre
+		-et tu copie colle simplement "C:\" (sans les guillemets) dans la boite. puis ok.
+
+	-une fois que t'es dans C:, crée un dossier qui s'appelle juste "FFMPEG" (le nom est pas important mais au moins on sait c'est quoi)
+        -déverse tout ce qu'il y a dans le zip dans ce dossier que tu viens de créer.
+
+
+
+Et la partie la plus dur est finie.
+
+Clique sur "setup.exe", qui va te guider par lui même. 
+
+Et le programme est près à être utilisé.
+
+POUR CA:
+
+ -Pour modifier ou ajouter des cartes, ouvre "cards.txt" avec bloc note, ou, préférablement notepad++ (plus clean)
+ 
+ -Pour ajouter des sons, met des .mp3 ou des .wav dans le dossier "sounds"
+
+Dernière étape: génerer le deck.
+
+    Double-clique sur "Deck Generator.exe". (t'inquiète si il crie des erreurs c'est normal)
+
+
+ET POUR GARDER LA PROGRESSION, DOUBLE CLIQUE LE TRUC TRES OBVIOUS POUR QUE TOUT SE SYNCHRONISE.
+
+Ensuite, il y a plus qu'a importer le nouveau deck updated dans anki (c'est à dire, le double cliquer.)

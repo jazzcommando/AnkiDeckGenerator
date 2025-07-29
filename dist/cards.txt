@@ -1,0 +1,16 @@
+#-------GUIDE DE SYNTAXE---------------
+#
+# 1) Chaque ligne commencant par un hashtag sera ignorée par le script
+# 2) Chaque ligne *sans* hashtag représente une carte.
+# 3) Le format correcte pour ajouter une nouvelle carte est:
+#       Question >> Réponse (les doubles fléches séparent la question de la réponse)
+# 4) POUR AJOUTER DE L'AUDIO --> déjà s'assurer que le fichier est bien présent dans le dossier "sounds"
+#    à part ça, il faut juste rajouter "sounds/fichier.mp3" entre guillemet, ça marche de chaque coté de la carte.
+#
+# -----GUIDE FINI, DEBUT DU VRAI FICHIER-------------
+
+2+2? >> 4
+Who that be? "sounds/meow.mp3" >> da gato
+Le chiffre quatre se prononce: >> "sounds/four.wav"
+WHO THAT BE AGAIN? (wav edition, debug lol) >> "meow2.wav"
+do u love me??? >> i cannot answer that for you my sweet princess.
