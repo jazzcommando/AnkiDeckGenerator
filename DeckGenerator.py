@@ -1,11 +1,22 @@
 # IMPORT DES PACKAGES REQUIS
+import configparser
+CONFIG_FILE = 'config.ini'
+config = configparser.ConfigParser()
+try:
+    config.read(CONFIG_FILE, encoding='utf-8')
+except Exception as e:
+    # Plutôt qu'un exit brutal, on log l'erreur et on utilise des fallbacks
+    print(f"[DECKGEN] Erreur lecture config: {e}. Utilisation des valeurs par défaut.")
+    config.add_section('DECK_SETTINGS')
+    config.add_section('TOOL_PATHS')
+
 import genanki
 import re
 import subprocess
 import os
 
 # --- CHEMIN VERS FFMPEG, ULTRA PUTAIN D'IMPORTANT ---
-FFMPEG_PATH = r"C:\FFMPEG\ffmpeg-7.1.1-essentials_build\bin\ffmpeg.exe"
+FFMPEG_PATH = config.get('TOOL_PATHS', 'ffmpeg_executable', fallback='ffmpeg')
 # --------------------------
 
 
@@ -43,7 +54,7 @@ MY_DECK_ID = 2059400110
 CARD_CSS = """
 .card {
     font-family: Arial;
-    font-size: 20px;
+    font-size: 24px;
     text-align: center;
     color: black;
     background-color: white;
@@ -77,7 +88,8 @@ model = genanki.Model(
     css=CARD_CSS
 )
 
-deck = genanki.Deck(MY_DECK_ID, 'Englando Deck')
+deck_name_from_config = config.get('DECK_SETTINGS', 'deck_name', fallback='Englando Deck')
+deck = genanki.Deck(2059400110, deck_name_from_config)
 media_files = []  # Liste pour stocker les chemins des fichiers média
 
 
@@ -177,7 +189,10 @@ def process_side(raw_text_side, sounds_base_dir):
 # Processing final et génération du deck (mon dieu enfin)
 print('Ca génère, croise les doigts.')
 parse_file('cards.txt')
-genanki.Package(deck, media_files).write_to_file('output.apkg')
+output_dir_from_config = config.get('DECK_SETTINGS', 'output_directory', fallback=os.path.dirname(os.path.abspath(__file__)))
+output_filepath = os.path.join(output_dir_from_config, 'output.apkg')
+genanki.Package(deck, media_files).write_to_file(output_filepath)
+print(f"\n🎉 Deck créé avec succès : '{output_filepath}'")
 print(f"\n DECK CREE AVEC FUCKING SUCCES : 'output.apkg'")
 print(f"Total cartes: {len(deck.notes)} | Total fichiers média: {len(media_files)}")
 print("OUBLIE PAS DE METTRE LE FICHIER ANKI A JOUR!")
