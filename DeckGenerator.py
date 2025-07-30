@@ -1,56 +1,20 @@
-# IMPORT DES PACKAGES REQUIS
-import configparser
-CONFIG_FILE = 'config.ini'
-config = configparser.ConfigParser()
-try:
-    config.read(CONFIG_FILE, encoding='utf-8')
-except Exception as e:
-    # Plutôt qu'un exit brutal, on log l'erreur et on utilise des fallbacks
-    print(f"[DECKGEN] Erreur lecture config: {e}. Utilisation des valeurs par défaut.")
-    config.add_section('DECK_SETTINGS')
-    config.add_section('TOOL_PATHS')
+# carte encodées en utf-8
 
 import genanki
 import re
 import subprocess
 import os
 
-# --- CHEMIN VERS FFMPEG, ULTRA PUTAIN D'IMPORTANT ---
-FFMPEG_PATH = config.get('TOOL_PATHS', 'ffmpeg_executable', fallback='ffmpeg')
-# --------------------------
+# ══════════════════════════════════════════════════════
+# Pas de CONFIGURATION ici ! Les paramètres seront passés à la fonction generate_deck
+# ══════════════════════════════════════════════════════
 
+# ══════════════════════════════════════════════════════
+# GENANKI SETUP (Ceci reste global car les modèles sont souvent statiques)
+# ══════════════════════════════════════════════════════
 
-def convert_wav_to_mp3(wav_path):
-    mp3_path = wav_path.replace('.wav', '.mp3')
-
-    if not os.path.exists(FFMPEG_PATH):
-        raise FileNotFoundError(f"FFmpeg non trouvé au chemin spécifié : {FFMPEG_PATH}")
-
-    if not os.path.exists(mp3_path):  # On évite de reconvertir si le MP3 existe déjà
-        print(f"🔄 Conversion : {wav_path} ➜ {mp3_path}")
-        try:
-            subprocess.run([
-                FFMPEG_PATH,
-                "-y",  # DELETE THE WAV, NEPHEW
-                "-i", wav_path,  # OUTPUT
-                "-codec:a", "libmp3lame",
-                "-qscale:a", "2",  # ça fait surement un truc ça
-                mp3_path
-            ], check=True, capture_output=True, text=True) # erreur check, debugging
-        except subprocess.CalledProcessError as e:
-            print(f"❌ ERREUR LORS DE LA CONVERSION AUDIO DE {wav_path}:")
-            print(f"  Stdout: {e.stdout}")
-            print(f"  Stderr: {e.stderr}")
-            raise
-    return mp3_path
-
-
-# MAGIE NOIRE
-# ID de modèle aléatoires pour éviter les conflits
 MY_MODEL_ID = 1607392319
-MY_DECK_ID = 2059400110
-
-# CSS pour centrer le texte
+MY_DECK_ID = 2059400110  # L'ID du deck reste fixe pour qu'Anki mette a jour
 CARD_CSS = """
 .card {
     font-family: Arial;
@@ -61,13 +25,14 @@ CARD_CSS = """
 }
 .question {
     padding: 10px;
-    max-width: 800px; /* Limite la largeur du texte */
-    margin: auto; /* Centre le bloc de texte */
-    word-wrap: break-word; /* Permet aux mots longs de se casser et de passer à la ligne */
-    box-sizing: border-box; /* Inclut le padding et la bordure dans la largeur totale */
+    max-width: 800px;
+    margin: auto;
+    word-wrap: break-word;
+    box-sizing: border-box;
 }
 """
 
+# Le modèle est initialisé une fois pour toutes
 model = genanki.Model(
     MY_MODEL_ID,
     'Text+Sound Auto Model',
@@ -80,7 +45,6 @@ model = genanki.Model(
     templates=[
         {
             'name': 'Card Template',
-            # On ajoute une div avec une classe 'question' pour appliquer le CSS
             'qfmt': '<div class="question">{{Question}}</div><br>{{AudioQ}}',
             'afmt': '{{FrontSide}}<hr id="answer"><div class="question">{{Answer}}</div><br>{{AudioA}}',
         },
@@ -88,111 +52,130 @@ model = genanki.Model(
     css=CARD_CSS
 )
 
-deck_name_from_config = config.get('DECK_SETTINGS', 'deck_name', fallback='Englando Deck')
-deck = genanki.Deck(2059400110, deck_name_from_config)
-media_files = []  # Liste pour stocker les chemins des fichiers média
+
+# Les variables deck et media_files seront initialisées DANS la fonction generate_deck
+# car elles dépendent de chaque exécution et ne doivent pas persister entre les appels
+
+# ══════════════════════════════════════════════════════
+# FONCTIONS UTILITAIRES
+# ══════════════════════════════════════════════════════
+
+def convert_wav_to_mp3(wav_path, ffmpeg_path):  # Ajout de ffmpeg_path en parametre
+    mp3_path = wav_path.replace('.wav', '.mp3')
+    if not os.path.exists(ffmpeg_path) and ffmpeg_path != "ffmpeg":
+        raise FileNotFoundError(f"FFmpeg introuvable au chemin spécifié: {ffmpeg_path}. Vérifiez votre configuration.")
+
+    # Si ffmpeg_path est juste "ffmpeg", subprocess va le chercher dans le PATH
+    ffmpeg_cmd = [ffmpeg_path, "-y", "-i", wav_path, "-codec:a", "libmp3lame", "-qscale:a", "2", mp3_path]
+
+    if not os.path.exists(mp3_path) or os.path.getmtime(wav_path) > os.path.getmtime(mp3_path):
+        print(f"🔄 Conversion WAV ➜ MP3 : {os.path.basename(wav_path)} ➜ {os.path.basename(mp3_path)}")
+        try:
+            subprocess.run(ffmpeg_cmd, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as e:
+            error_message = f"❌ ERREUR conversion {os.path.basename(wav_path)} :\n  Stdout: {e.stdout}\n  Stderr: {e.stderr}"
+            print(error_message)
+            raise Exception(f"Erreur de conversion audio: {error_message}")  # Propagate a more generic exception
+        except FileNotFoundError:  # Gérer le cas où ffmpeg n'est pas trouvé dans le PATH
+            raise FileNotFoundError(
+                "FFmpeg introuvable. Assurez-vous qu'il est installé et que son chemin est configuré ou dans votre PATH.")
+    return mp3_path
 
 
-# Définit la fonction qui permet d'identifier les pointeurs audio dans une chaîne de texte
-# Cherche "chemin/vers/fichier.mp3" ou "chemin/vers/fichier.wav"
-def extract_audio_path(text_with_audio):
-    match = re.search(r'"([^"]+\.(?:mp3|wav))"', text_with_audio)
+def extract_audio_path(text):
+    match = re.search(r'"([^"]+\.(?:mp3|wav))"', text)
     return match.group(1) if match else None
 
 
-# Juicy stuff: extraction du .txt en un truc que python peut lire
-def parse_file(filepath):
-    # Chemin absolu du dossier 'sounds' pour la gestion des médias. KEYWORD: ABSOLU.
-    sounds_dir = os.path.join(os.path.dirname(os.path.abspath(filepath)), 'sounds')
-    if not os.path.exists(sounds_dir):
-        print(f"⚠️ GAFFE, ERREUR : LE DOSSIER 'sounds' N'EXISTE PAS A L'EMPLACEMENT ATTENDU : {sounds_dir}")
-        print(" Solution: mettre les audios dans ce dossier là.")
-
-
-    with open(filepath, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-
-
-    for line_num, line in enumerate(lines, 1):
-        stripped_line = line.strip()
-        if not stripped_line or stripped_line.startswith('#'): #ignore les lignes avec les hashtags, simplifie la vie
-            continue
-
-        try:
-            if ' >> ' not in stripped_line:
-                raise ValueError("Erreur: oublié de mettre les deux fléches (>>) entre question et réponse")
-
-            q_raw, a_raw = stripped_line.split(' >> ', 1)
-
-            # aucune idée de ce que ce truc fait
-            q_text, q_audio_tag, q_audio_filepath = process_side(q_raw, sounds_dir)
-            a_text, a_audio_tag, a_audio_filepath = process_side(a_raw, sounds_dir)
-
-            # same
-            if q_audio_filepath and os.path.exists(q_audio_filepath):
-                media_files.append(q_audio_filepath)
-            elif q_audio_filepath and not os.path.exists(q_audio_filepath):
-                print(f"❌ ERREUR : Fichier audio manquant pour la question (ligne {line_num}): {q_audio_filepath}")
-
-            if a_audio_filepath and os.path.exists(a_audio_filepath):
-                media_files.append(a_audio_filepath)
-            elif a_audio_filepath and not os.path.exists(a_audio_filepath):
-                print(f"❌ ERREUR : Fichier audio manquant pour la réponse (ligne {line_num}): {a_audio_filepath}")
-
-
-            note = genanki.Note(
-                model=model,
-                fields=[q_text, a_text, q_audio_tag, a_audio_tag]
-            )
-            deck.add_note(note)
-
-        except Exception as e:
-            print(f"\n❌ ERREUR DE SYNTAXE DANS LE FICHIER '{filepath}' LIGNE {line_num}:")
-            print(f"   Ligne : '{line.strip()}'")
-            print(f"   Erreur: {e}")
-            print("   Vérifier cards.txt: 'Question text \"audio_q.mp3\" >> Answer text \"audio_a.mp3\"'\n")
-
-
-# génération des cartes via les données extraites de cards.txt
-def process_side(raw_text_side, sounds_base_dir):
-    audio_file_in_text = extract_audio_path(raw_text_side)
+def process_side(text, sounds_dir, ffmpeg_path):  # Ajout de ffmpeg_path en parametre
+    audio_filename = extract_audio_path(text)
     audio_tag = ''
-    audio_full_path = None
-    processed_text = raw_text_side.strip() # Commence avec le texte brut
+    full_audio_path = None
+    cleaned_text = text.strip()
 
-    if audio_file_in_text:
-        # Supprime le chemin audio du texte pour n'afficher que le texte pur sur la carte (sinon tout est fuckd)
-        processed_text = raw_text_side.replace(f'"{audio_file_in_text}"', '').strip()
+    if audio_filename:
+        cleaned_text = cleaned_text.replace(f'"{audio_filename}"', '').strip()
+        full_audio_path = os.path.join(sounds_dir, os.path.basename(audio_filename))
 
-        # Construction du chemin absolu du fichier audio
-        # ça c'est juste de la magie noire mais ok
-        audio_full_path = os.path.join(sounds_base_dir, os.path.basename(audio_file_in_text))
-
-        # Vérifie si c'est un PUTAIN DE WAV et convertit si nécessaire
-        if audio_full_path.lower().endswith(".wav"):
+        if full_audio_path.lower().endswith('.wav'):
             try:
-                converted_mp3_path = convert_wav_to_mp3(audio_full_path)
-                # Le tag Anki doit pointer vers le fichier MP3 converti
-                audio_tag = f"[sound:{os.path.basename(converted_mp3_path)}]"
-                audio_full_path = converted_mp3_path # Met à jour le chemin pour l'ajouter aux médias
+                # Appelle la fonction de conversion avec le chemin ffmpeg
+                full_audio_path = convert_wav_to_mp3(full_audio_path, ffmpeg_path)
+                audio_tag = f"[sound:{os.path.basename(full_audio_path)}]"
             except Exception as e:
-                print(f"⚠️ Echec de la converssion d'un putain de WAV. ({audio_full_path}). L'audio ne sera pas inclus. Erreur: {e}")
-                audio_tag = ''  # Pas de tag si la conversion échoue
-                audio_full_path = None
+                print(f"⚠️ Conversion échouée : {os.path.basename(full_audio_path)} ➜ {e}")
+                # Ne pas ajouter le fichier au media_files si la conversion échoue
+                return cleaned_text, '', None
         else:
-            # Si c'est déjà un MP3 ou autre format supporté (et non WAV), on utilise tel quel
-            audio_tag = f"[sound:{os.path.basename(audio_full_path)}]"
+            audio_tag = f"[sound:{os.path.basename(full_audio_path)}]"
 
-    return processed_text, audio_tag, audio_full_path
+    return cleaned_text, audio_tag, full_audio_path
 
 
-# Processing final et génération du deck (mon dieu enfin)
-print('Ca génère, croise les doigts.')
-parse_file('cards.txt')
-output_dir_from_config = config.get('DECK_SETTINGS', 'output_directory', fallback=os.path.dirname(os.path.abspath(__file__)))
-output_filepath = os.path.join(output_dir_from_config, 'output.apkg')
-genanki.Package(deck, media_files).write_to_file(output_filepath)
-print(f"\n🎉 Deck créé avec succès : '{output_filepath}'")
-print(f"\n DECK CREE AVEC FUCKING SUCCES : 'output.apkg'")
-print(f"Total cartes: {len(deck.notes)} | Total fichiers média: {len(media_files)}")
-print("OUBLIE PAS DE METTRE LE FICHIER ANKI A JOUR!")
+# ══════════════════════════════════════════════════════
+# LOGIQUE PRINCIPALE DE GENERATION DE DECK
+# ══════════════════════════════════════════════════════
+
+def generate_deck(cards_file, deck_name, ffmpeg_path, output_filepath):  # Tous les parametres sont passes ici
+    print("🚀 Génération du deck Anki...")
+
+    # Initialisation de deck et media_files pour chaque generation
+    current_deck = genanki.Deck(MY_DECK_ID, deck_name)  # Utilisez le deck_name passe en parametre
+    current_media_files = []
+
+    sounds_dir = os.path.join(os.path.dirname(os.path.abspath(cards_file)), 'sounds')
+    if not os.path.exists(sounds_dir):
+        print(f"⚠️ Dossier 'sounds' manquant : {sounds_dir}. Aucun audio ne sera ajouté.")
+        os.makedirs(sounds_dir, exist_ok=True)  # Creer le dossier s'il n'existe pas
+
+    try:
+        with open(cards_file, 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+
+                try:
+                    if ' >> ' not in line:
+                        raise ValueError("Séparateur '>>' manquant entre question et réponse.")
+
+                    q_raw, a_raw = line.split(' >> ', 1)
+                    # Passez ffmpeg_path a process_side
+                    q_text, q_tag, q_path = process_side(q_raw, sounds_dir, ffmpeg_path)
+                    a_text, a_tag, a_path = process_side(a_raw, sounds_dir, ffmpeg_path)
+
+                    for path in (q_path, a_path):
+                        if path:
+                            if os.path.exists(path):
+                                current_media_files.append(path)
+                            else:
+                                print(f"❌ Fichier audio introuvable (mentionné dans cards.txt) : {path}")
+
+                    note = genanki.Note(
+                        model=model,
+                        fields=[q_text, a_text, q_tag, a_tag]
+                    )
+                    current_deck.add_note(note)
+
+                except Exception as e:
+                    print(
+                        f"\n❌ LIGNE {line_num} ✖️\n   '{line}'\n   Erreur lors du traitement: {e}\n   Format attendu : Texte \"audio.mp3\" >> Réponse \"audio.mp3\"")
+                    # Continue a la ligne suivante meme en cas d'erreur sur une carte
+
+
+    except FileNotFoundError:
+        print(f"❌ Erreur: Le fichier '{cards_file}' n'a pas été trouvé.")
+        raise  # Relaunch l'exception pour que la GUI la capture
+    except Exception as e:
+        print(f"❌ Erreur générale lors de la lecture/traitement de '{cards_file}': {e}")
+        raise  # Relaunch l'exception
+
+    # Sauvegarde du package Anki
+    # Le chemin de sortie complet est deja passe en parametre
+    genanki.Package(current_deck, current_media_files).write_to_file(output_filepath)
+    print(f"\n🎉 Deck créé avec succès ➜ '{output_filepath}'")
+    print(f"📦 Cartes: {len(current_deck.notes)} | Médias: {len(current_media_files)}")
+
+# Le bloc __main__ est vide ou supprimé car le script est importé comme un module
+# if __name__ == '__main__':
+#    generate_deck() # Cette ligne ne sera plus executee lors de l'import
